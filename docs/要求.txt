@@ -1,0 +1,223 @@
+# 完整内容提取
+## 一、计算F*
+### （一）基础定义与约束
+1. 变量定义
+- \(u = u_a\)（\(a \in A\)）：每条路段的收费水平，\(A\) 为路段集合；
+- \(U = [0, \hat{u}]\)：收费水平的加盒约束，\(\hat{u}\) 为收费上限（取20）；
+- \(supp(u) = \{a \in A; u_a \neq 0\}\)：非零收费路段集合，满足 \(|supp(u)| \leq K\)（\(K\) 为最大收费路段数）；
+- \(x_a = v_a + h_a\)：路段 \(a\) 的总流量，其中 \(v_a\) 为拼车司机在路段 \(a\) 的流量，\(h_a\) 为独驾司机在路段 \(a\) 的流量；
+- \(t_a(x_a) = t_a^0(1 + 0.15(\frac{x_a}{C_a})^4)\)（\(a \in A\)）：路段 \(a\) 的行驶时间函数，\(t_a^0\) 为自由行驶时间，\(C_a\) 为路段 \(a\) 的容量；
+- \(t_0 = 4\)、\(\Delta = 5\)：常数；
+- \(m \in M\)：乘客OD对集合；
+- \(w \in W\)：司机OD对集合；
+- \(r \in R_{wm}\)：司机OD对为 \(w\)、服务乘客OD为 \(m\) 的轨迹集合；
+- \(\delta_{a,r}\)：路段 \(a\) 在轨迹 \(r\) 上则为1，否则为0；
+- \(f_{r,wm}\)：司机OD对为 \(w\)、服务乘客OD为 \(m\)、在轨迹 \(r\) 上的流量；
+- \(y_{r,w}\)：司机OD对为 \(w\)、在轨迹 \(r\) 上单独驾驶的流量；
+- \(d_w\)：司机OD对为 \(w\) 的需求；
+- \(q_m\)：乘客OD对为 \(m\) 的需求；
+- \(\sum_{r,w,m}\)：分别对 \(r\)、\(w\)、\(m\) 求和。
+
+2. 核心模型
+- 上层模型目标函数：
+\[min _{u, f, y} F(x) = \sum_{a \in A} t_a(x_a) \cdot x_a + t_0 \sum_{r, w, m} f_{r, wm}\]
+s.t. \(u \in U\)、\(|supp(u)| \leq K\)、\((f, y) \in S(u)\)
+
+- 下层模型目标函数：
+\[min _{f,y}L(f,y,u) = \sum _{a\in A}\left[ \int _{0}^{x_{a}}t_{a}(w) + u_{a}\right] dw + \left( t_{0}+\Delta \right) \sum _{r,w,m}f_{r,wm}\]
+s.t.（约束1）：
+  - \(\sum_{m, r} f_{r, w m} + \sum_{r} y_{r, w} = d_{w} \quad \forall w \in W\)
+  - \(\sum_{w, r} f_{r, w m} \geq q_{m} \quad \forall m \in M\)
+  - \(v_{a} = \sum _{r,w,m}f_{r,wm}\delta _{a,r}\)；\(h_{a} = \sum _{r,w}y_{r,w}\delta _{a,r} \quad \forall a\in A\)
+  - \(f, y \geq 0\)
+
+### （二）关键函数与模型转化
+1. 辅助函数
+- 值函数：\(V(u) = \inf_{f,y\in \Omega }L(f,y,u)\)（\(\Omega\) 为满足约束1的集合）；
+- Gap函数：\(Gap(u, f, y) = L(f, y, u) - V(u)\)；
+- 引入辅助变量 \(z = u\)（\(z \in U\)，不受基数约束但受加盒约束），将双层模型转化为单层模型：
+
+\[min _{u, z, f, y} F(x) = \sum_{a \in A} t_a(x_a) \cdot x_a\]
+s.t.：
+  - \(u \in U \cap U_K\)（\(U_K = \{ u: |supp(u)| \leq K\}\)）
+  - \((f, y) \in \Omega\)
+  - \(z \in U\)
+  - \(L(f, y, z) - V(z) \leq 0\)
+  - \(u - z = 0\)
+
+2. 罚函数处理
+引入惩罚参数 \(\rho_1, \rho_2 > 0\)，将约束融入目标函数，得到单层“罚分解”近似问题 \((PA_{\rho k})\)：
+
+\[min_{u,z,f,y}\Phi _{\rho }(u,z,f,y) = F(x) + \rho_1[L(f,y,z) - V(z)] + \rho_2\| u - z\|^2\]
+s.t. \(u \in U_k\)、\(z \in U\)、\(f,y \in \Omega\)
+
+### （三）参数设置
+- 初始惩罚因子：\(\rho^1 = (\rho_1^1, \rho_2^1) = (1,1)\)；
+- 罚增长因子：\(\gamma = (\gamma_1, \gamma_2) = (1.8,5)\)；
+- 常数：\(t_0 = 4\)、\(\Delta = 5\)。
+
+### （四）算法步骤（外层更新罚参数+内层块坐标下降）
+1. Step0（初始化）
+- 选择 \(z_0^1 \in U\)：若 \(K > 0.2|A|\)（\(|A|\) 为路段总数），则 \(z_0^1 = 0\)；否则取1；
+- 设定 \(\rho^1 = (\rho_1^1, \rho_2^1) > 0\)、\(\gamma = (\gamma_1, \gamma_2) > 1\)；
+- 选取初始可行解 \((u^{feas}, f^{feas}, y^{feas})\)：\((f^{feas}, y^{feas})\) 为 \(u^{feas}\) 下的下层拼车均衡解（采用带平均操作的对偶次梯度法+Frank-wolfe算法）；
+- 选择常数 \(B \geq max\{F(f^{feas}, y^{feas})\}\)，用于热启动；
+- 设 \(k = 1\)。
+
+2. Step1（内循环）：解 \((PA_{\rho k})\) 问题
+- 1.1：初始收费向量 \(z^1 \in U\)，设 \(r = 0\)；
+- 1.2：给定 \(z^{r+1}\)，优化 \(f^{r+1}\)、\(y^{r+1}\)、\(u\)：
+  - 优化 \(u\)：\(min _{u \in U_{\kappa}}\left\|u - z^{r+1}\right\|^2\)，保留 \(\kappa\) 个绝对值最大的分量，其他置零；
+  - 优化 \((f, y)\)：\(min F(x) + \rho_1 L(f, y, z^{r+1})\)，转化为广义Beckman问题，用贪心路径算法；
+  - 若 \((u^{r+1}, z^{r+1}, f^{r+1}, y^{r+1})\) 为KKT稳定点，停止并令 \((u_{\rho}^*, z_{\rho}^*, f_{\rho}^*, y_{\rho}^*) = (u^{r+1}, z^{r+1}, f^{r+1}, y^{r+1})\)；否则 \(r = r+1\)，转1.3；
+- 1.3：固定 \((u^r, f^r, y^r)\)，优化 \(z^{r+1}\)（\(min \Phi_{\rho}(u^r, z, f^r, y^r)\)），采用投影梯度法（\(\nabla V(z) = S(z)\)，\(S(z)\) 为当前收费 \(z\) 下下层问题的均衡解），转1.2。
+
+3. Step2（收敛判断）
+若 \(\frac{L(z^k, f^k, y^k) - V(z^k)}{max\{L(z^k, f^k, y^k), 1\}} \leq \varepsilon_1 = 0.0001\) 且 \(\frac{\left\|u^k - z^k\right\|}{max\{\left\|u^k\right\|, 1\}} \leq \varepsilon_2 = 0.001\)，停止；否则增大罚参数：\(\rho^{k+1} = (\gamma_1 \rho_1^k, \gamma_2 \rho_2^k)\)。
+
+4. Step3（迭代更新）
+- 设 \(z_0^{k+1} = z^k\)，若 \(min _{u \in U_k, (f, y) \in \Omega} \Phi_{\rho^{k+1}}(u, z^k, f, y) \leq B\)，否则 \(z_0^{k+1} = u^{feas}\)；
+- 设 \(k = k+1\)，转Step1。
+
+### （五）F* 计算
+通过上述算法得到均衡流量分布 \(f_{r,wm}\)、\(y_{r,w}\)，代入 \(x_a = \sum_{r,w,m} f_{r,wm} \delta_{a,r} + \sum_{r,w} y_{r,w} \delta_{a,r}\)，再代入 \(F(x) = \sum_{a \in A} t_a(x_a) \cdot x_a + t_0 \sum_{r,w,m} f_{r,wm}\)，得到 \(F^*\)。
+
+## 二、计算Fue（无收费下层拼车用户均衡解，\(u_a = 0\)）
+### （一）模型与拉格朗日函数
+1. 目标模型
+\[min _{f, y, x} L(f, y, x) = \sum_{a \in A}\left[\int_{0}^{x_a} t_a(w)\right] dw + \left(t_0 + \Delta\right) \sum_{r,w,m} f_{r,wm}\]
+
+2. 拉格朗日函数
+\[Z(p, f, y, x) = L(f, y, x) + \sum_{m \in M} p_m(q_m - \sum_{w \in W} \sum_{r \in R_{wm}} f_{r,wm})\]
+
+3. 对偶子问题
+\(\theta(p) = min _{(f,y,x)} Z(p, f, y, x)\)，s.t. \((f,y,x) \in \tilde{\Omega}\)，其中 \(\tilde{\Omega} = \left\{ (f,y,x) \geq 0 \mid \sum _{m\in M}\sum _{r\in R_{wm}}f_{r,wm} + \sum _{r\in R_{w}}y_{r,w} = d_w, w\in W \right\}\)
+
+### （二）算法1：带平均操作的对偶次梯度法
+1. Step0（初始化）：选择起点 \(p^0 = (p_m^0, m \in M) \geq 0\)，设 \(n = 0\)；
+2. Step1（解对偶子问题）：求解 \(\Theta(p^n)\)，得到最优链路和轨迹流量向量 \(x(p^n)\)、\(f(p^n)\)、\(y(p^n)\)；定义拼车司机供给 \(s(p^n) = (s_m(p^n), m \in M)\)，其中 \(s_m(p^n) = \sum_{w \in W} \sum_{r \in R_{wm}} f_{r,wm}(p^n)\)；
+3. Step2（对偶更新）：\(p^{n+1} = max\{p^n + \alpha^n(q - s(p^n)), 0\}\)，其中 \(\alpha^n = \hat{a}/(1+n)\)，\(\hat{a} = 1\)；
+4. Step3（生成遍历序列）：
+\[
+\hat{s}^n = \sum_{t=0}^{n-1} \gamma_t^n s(p^t), \hat{x}^n = \sum_{t=0}^{n-1} \gamma_t^n x(p^t), \hat{f}^n = \sum_{t=0}^{n-1} \gamma_t^n f(p^t), \hat{y}^n = \sum_{t=0}^{n-1} \gamma_t^n y(p^t)
+\]
+其中 \(\gamma_t^n = \frac{(t+1)^k}{\sum_{l=0}^{n-1}(l+1)^k}\)，\(k \geq 0\) 为常数；
+5. Step4（收敛判断）：若 \(\frac{\left\|min\{\hat{s}^n - q, 0\}\right\|_h}{\|\hat{q}\|_1} \leq \varepsilon_3 = 0.005\) 且 \(\frac{|L(\hat{f}^n, \hat{y}^n, \hat{x}^n) - \Theta(\hat{p}^{n+1})|}{L(\hat{f}^n, \hat{y}^n, \hat{x}^n)} \leq \varepsilon_4 = 0.0005\)，停止；否则 \(n = n+1\)，转Step1。
+
+### （三）算法2：Frank-Wolfe算法
+1. Step0（初始化）：设 \((f^0, y^0, x^0) \in \tilde{\Omega}\) 为初始可行流量模式，设 \(k = 0\)；
+2. Step1（搜索方向生成）：令 \(z = (f, y)\)，求解线性规划得到 \(\overline{z}^k = (\overline{f}^k, \overline{y}^k)\) 和 \(\overline{x}^k\)：
+\[
+(\overline{z}^k, \overline{x}^k) \in \underset{z, x}{argmin} \nabla_{z} Z(p, f^k, x^k)^T(z - z^k), s.t. (z, x) \in \tilde{\Omega}
+\]
+3. Step2（步长更新）：选择步长 \(\beta^k\)，满足 \(min _{\beta \in[0,1]} Z(p, f^k + \beta(\overline{f}^k - f^k), x^k + \beta(\overline{x}^k - x^k))\)；
+4. Step3（变量更新）：\(x^{k+1} = x^k + \beta^k(\overline{x}^k - x^k)\)，\(y^{k+1} = y^k + \beta^k(\overline{y}^k - y^k)\)，\(f^{k+1} = f^k + \beta^k(\overline{f}^k - f^k)\)；
+5. Step4（收敛判断）：定义
+\[
+\Delta(x, f, y, p) = \left|1 - \frac{\sum_{w \in W} d_w \mu_w(x, f, y, p)}{\sum_{a \in A} x_a[t_a(x_a) + u_a] + (t_0 + \Delta) \sum_{m \in M} s_m(f) - \sum_{m \in M} p_m s_m(f)}\right|
+\]
+其中 \(\mu_w(x, f, y, p)\) 为OD对 \(w\) 下司机的最小广义出行成本，\(s_m(f) = \sum_{w \in W} \sum_{r \in R_{wm}} f_{r,wm}\)；若 \(\Delta(x^{k+1}, f^{k+1}, y^{k+1}, p) \leq \varepsilon_5 = 0.0005\)，停止并设 \(x(p) = x^{k+1}\)、\(f(p) = f^{k+1}\)、\(y(p) = y^{k+1}\)、\(\theta(p) = Z(p, x(p), f(p))\)；否则 \(k = k+1\)，转Step1。
+
+### （四）补充说明（Step1优化）
+1. 拼车司机三段式轨迹：
+- 接客：司机起点 \(o_w \to\) 乘客起点 \(o_m\)；
+- 送客：乘客起点 \(o_m \to\) 乘客终点 \(e_m\)；
+- 前往自身终点：乘客终点 \(e_m \to\) 司机终点 \(e_w\)；
+- 对上述三个OD对分别求最短路径，拼接得到拼车司机最小轨迹成本 \(g_{r,wm}\)；
+- 独驾司机轨迹：司机起点 \(o_w \to\) 司机终点 \(e_w\)，求最短路径得到最小轨迹成本 \(g_r\)。
+
+2. 线性规划转化：
+Step1的线性规划可转化为：
+\[min\sum _{m \in M} \sum _{w \in W} \sum _{r\in R_{wm}} f_{r,wm}\left( g_{r,wm}(x^k) - p_m\right) + \sum _{w\in W} \sum _{r\in R_{w}}y_{r,w} g_r(x^k)\]
+其中：
+\[g_{r,wm}(x^k) = \frac{\partial L}{\partial f_{r,wm}} = \sum_{a \in A} \delta_{a,r}[t_a(x_a^k) + u_a] + t_0 + \Delta, r \in R_{wm}, m \in M, w \in W\]
+\[g_{r,w}(x^k) = \frac{\partial L}{\partial y_{r,w}} = \sum _{a\in A}\delta _{a,r}[t_a(x_a^k) + u_a], r \in R_w, w \in W\]
+优化目标为将司机OD对的全部需求分配到独驾或拼车的最小轨迹上，得到新流量分配 \(\overline{z}^k = (\overline{f}^k, \overline{y}^k)\)，最小成本为 \(c_r(w)(x^k, p) = min\{g_{r,wm}(x^k) - p_m\ (r \in R_{wm}, m \in M); g_{r,w}(x^k)\ (r \in R_w)\}\)。
+
+### （五）Fue计算
+通过上述算法得到无收费均衡流量分布 \(f_{r,wm}\)、\(y_{r,w}\)，代入 \(x_a = \sum_{r,w,m} f_{r,wm} \delta_{a,r} + \sum_{r,w} y_{r,w} \delta_{a,r}\)，再代入 \(F(x) = \sum_{a \in A} t_a(x_a) \cdot x_a + t_0 \sum_{r,w,m} f_{r,wm}\)，得到 \(Fue\)。
+
+## 三、计算Fso
+### （一）约束转化的理论依据
+Fso的目标函数为：
+\[min _{f,y} F(x) = \sum_{a \in A} t_a(x_a) \cdot x_a + t_0 \sum_{r,w,m} f_{r,wm}\]
+其中 \(t_0 = 4 > 0\)，即拼车行为存在固定成本。系统最优的核心是最小化总成本，因此在满足乘客需求的前提下，绝不会产生“超额拼车流量”（超额部分会额外增加 \(t_0 \sum f_{r,wm}\) 的成本，违背“最优”逻辑）。
+
+由此可推出：**Fso的最优解中，乘客需求约束必然以“等式”形式成立**，即：
+\[\sum_{w,r} f_{r,wm} = q_m \quad \forall m \in M\]
+（若存在 \(\sum_{w,r} f_{r,wm} > q_m\)，可减少超额部分的拼车流量，转化为独驾流量，总成本会降低，与“最优解”矛盾）。基于此，可直接将不等式约束转化为等式约束，适配FW算法的求解逻辑。
+
+### （二）约束条件
+\[
+\begin{cases}
+\sum_{m, r} f_{r, w m} + \sum_{r} y_{r, w} = d_{w} \quad \forall w \in W \\
+\sum_{w, r} f_{r, w m} = q_{m} \quad \forall m \in M \\
+v_{a} = \sum _{r,w,m}f_{r,wm}\delta _{a,r}；h_{a} = \sum _{r,w}y_{r,w}\delta _{a,r} \quad \forall a\in A \\
+f, y \geq 0
+\end{cases}
+\]
+
+### （三）目标函数与求解
+1. 目标函数
+\[min _{f, y} F(x) = \sum_{a \in A} t_a(x_a) \cdot x_a + t_0 \sum_{r, w, m} f_{r,wm}\]
+
+2. FW算法适配步骤（解决不等式约束适配问题）
+#### （1）重新定义可行域
+设Fso的可行域为 \(\Omega_{SO}\)：
+\[
+\Omega_{SO} = \{ (f,y,x) \geq 0 \mid 
+\begin{cases} 
+\sum_{m,r} f_{r,wm} + \sum_r y_{r,w} = d_w \quad \forall w \in W \\
+\sum_{w,r} f_{r,wm} = q_m \quad \forall m \in M \\
+x_a = \sum_{r,w,m} f_{r,wm}\delta_{a,r} + \sum_{r,w} y_{r,w}\delta_{a,r} \quad \forall a \in A 
+\end{cases}
+\}
+\]
+
+#### （2）Step0（初始化）
+选择初始可行解 \((f^0, y^0, x^0) \in \Omega_{SO}\)，需满足：
+- 流量守恒：\(\sum_{m,r} f_{r,wm}^0 + \sum_r y_{r,w}^0 = d_w\)；
+- 乘客需求等式：\(\sum_{w,r} f_{r,wm}^0 = q_m\)；
+- 非负约束：\(f^0, y^0 \geq 0\)。
+初始化方法：先分配拼车流量满足 \(\sum_{w,r} f_{r,wm}^0 = q_m\)，剩余司机需求用独驾流量 \(y^0\) 填充。
+
+#### （3）Step1（搜索方向生成）
+求解线性规划子问题，生成最优搜索方向 \((\overline{z}^k, \overline{x}^k) = (\overline{f}^k, \overline{y}^k, \overline{x}^k)\)：
+\[
+\underset{z=(f,y), x}{argmin} \nabla_{z} F(f^k, x^k)^T (z - z^k)
+\]
+s.t. \((z, x) \in \Omega_{SO}\)
+
+线性规划目标函数可转化为：
+\[
+min \sum_{m,w,r} f_{r,wm} \cdot g_{r,wm}(x^k) + \sum_{w,r} y_{r,w} \cdot g_r(x^k)
+\]
+其中：
+- \(g_{r,wm}(x^k) = \sum_{a \in A} \delta_{a,r}t_a(x_a^k) + t_0\)（拼车轨迹成本，含固定成本 \(t_0\)）；
+- \(g_r(x^k) = \sum_{a \in A} \delta_{a,r}t_a(x_a^k)\)（独驾轨迹成本）。
+求解时沿用“最短路径+流量分配”逻辑，确保拼车流量总和刚好等于 \(q_m\)。
+
+#### （4）Step2（步长更新）
+选择步长 \(\beta^k \in [0,1]\)，满足：更新后的流量 \((f^k + \beta^k(\overline{f}^k - f^k), y^k + \beta^k(\overline{y}^k - y^k))\) 仍属于 \(\Omega_{SO}\)。因 \((f^k, y^k)\) 和 \((\overline{f}^k, \overline{y}^k)\) 均满足等式约束，任意步长 \(\beta^k \in [0,1]\) 均符合要求，步长优化逻辑为：
+\[min _{\beta \in[0,1]} F(f^k + \beta(\overline{f}^k - f^k), x^k + \beta(\overline{x}^k - x^k))\]
+
+#### （5）Step3（变量更新）
+\[
+x^{k+1} = x^k + \beta^k(\overline{x}^k - x^k), \quad y^{k+1} = y^k + \beta^k(\overline{y}^k - y^k), \quad f^{k+1} = f^k + \beta^k(\overline{f}^k - f^k)
+\]
+
+#### （6）Step4（收敛验证+约束满足校验）
+- 收敛判据：沿用成本平衡误差 \(\Delta \leq \varepsilon_5 = 0.0005\)，其中：
+\[
+\Delta = \left|1 - \frac{\sum_{w \in W} d_w \mu_w(x^{k+1}, f^{k+1}, y^{k+1})}{\sum_{a \in A} x_a^{k+1}t_a(x_a^{k+1}) + t_0 \sum_{r,w,m} f_{r,wm}^{k+1}}\right|
+\]
+\(\mu_w\) 为OD对 \(w\) 下司机的最小广义出行成本；
+- 约束校验：收敛后检查 \(\sum_{w,r} f_{r,wm}^* \approx q_m\)（允许数值误差≤1e-6），确保乘客需求等式约束满足。
+
+3. 特殊场景处理（需求不可行时）
+若因数据设定导致 \(q_m\) 过大（所有司机的拼车潜力总和\(< q_m\)），此时 \(\sum_{w,r} f_{r,wm} = q_m\) 无解，处理方式为：
+- 输出可行性提示：注明“乘客需求 \(q_m\) 不可行，FSO无可行解”；
+- 调整需求数据：建议将 \(q_m\) 下调至“司机拼车潜力总和”以下，或增加司机需求 \(d_w\)，确保问题可行。
+
+### （四）Fso计算
+通过调整后的FW算法得到系统最优流量分布 \(f_{r,wm}^*\)、\(y_{r,w}^*\)，代入 \(x_a = \sum_{r,w,m} f_{r,wm}^* \delta_{a,r} + \sum_{r,w} y_{r,w}^* \delta_{a,r}\)，再代入目标函数 \(F(x) = \sum_{a \in A} t_a(x_a) \cdot x_a + t_0 \sum_{r,w,m} f_{r,wm}\)，得到 \(Fso\)。
