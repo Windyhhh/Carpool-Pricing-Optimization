@@ -1,0 +1,6 @@
+init_node,term_node,capacity,length,free_flow_time,index
+1,2,100,6,10,1
+1,4,100,5,8,2
+2,3,100,4,9,3
+4,2,100,2,7,4
+4,3,100,1,8,5
