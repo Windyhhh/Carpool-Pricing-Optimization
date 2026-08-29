@@ -57,6 +57,47 @@ Carpool-Pricing-Optimization/
 
 ---
 
+## 技术实现细节
+
+### 架构概览
+
+项目采用模块化设计，核心目录包括：**data, docs, src**。
+
+### 核心类与模块
+
+- **Link**
+- **OD**
+- **Network**
+- **TrajectoryManager**
+
+### 关键函数
+
+- `travel_time`, `travel_time_derivative`, `travel_time_integral`, `load_from_directory`, `num_nodes`, `num_links`, `num_driver_ods`, `num_rider_ods`, `dijkstra`, `get_shortest_path`
+
+### 技术栈与依赖
+
+**核心框架/库**：NumPy, pandas
+
+**主要 import**：
+```python
+import numpy as np
+import pandas as pd
+import heapq
+import time
+import os
+from typing import Dict, List, Tuple, Optional, Set
+from dataclasses import dataclass
+from collections import defaultdict
+```
+
+### 实现要点
+
+- 以 `Link` 为核心类，封装主要业务逻辑
+- 通过 `travel_time` 等函数实现核心流程编排
+- 基于 NumPy, pandas 构建，保证技术栈成熟稳定
+- 代码结构清晰，模块间低耦合，便于扩展和维护
+
+---
 ## License
 
 MIT — free to use, modify and distribute.
