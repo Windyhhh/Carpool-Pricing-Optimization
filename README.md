@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚗 Carpool-Pricing-Optimization
+# 拼车定价优化 | Carpool-Pricing-Optimization
 
 ### PBCD carpool pricing with Frank-Wolfe, penalty and Dijkstra.
 
